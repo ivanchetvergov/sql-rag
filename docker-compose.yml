@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ml_comp_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ml_comp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:
