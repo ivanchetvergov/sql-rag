@@ -1,0 +1,206 @@
+{
+    "test_queries": [
+        {
+            "category": "Simple SELECT",
+            "queries": [
+                {
+                    "query": "Select all users",
+                    "expected": "Should return all users from User table",
+                    "difficulty": "easy"
+                },
+                {
+                    "query": "Select all active competitions",
+                    "expected": "Should filter by status='active'",
+                    "difficulty": "easy"
+                },
+                {
+                    "query": "Get all datasets",
+                    "expected": "Should return all from Dataset table",
+                    "difficulty": "easy"
+                }
+            ]
+        },
+        {
+            "category": "Time-based filters",
+            "queries": [
+                {
+                    "query": "Select all users who joined in 2023",
+                    "expected": "Should use User.created_at with EXTRACT(YEAR) = 2023",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Get competitions that started in 2024",
+                    "expected": "Should use Competition.start_at with year filter",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Select users who registered for competitions in January 2024",
+                    "expected": "Should use Participation.registered_at with month and year",
+                    "difficulty": "medium"
+                }
+            ]
+        },
+        {
+            "category": "JOIN queries",
+            "queries": [
+                {
+                    "query": "Get all competitions with their datasets",
+                    "expected": "Should JOIN Competition and Dataset on competition_id",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Select competitions organized by user with id 5",
+                    "expected": "Should JOIN User and Competition via organizer_id",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Get all submissions with their evaluation scores",
+                    "expected": "Should JOIN Submission and Evaluation on submission_id",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Select users who participated in competition with id 10",
+                    "expected": "Should JOIN User and Participation via user_id, filter by competition_id",
+                    "difficulty": "medium"
+                }
+            ]
+        },
+        {
+            "category": "Leaderboard & Winners",
+            "queries": [
+                {
+                    "query": "Who won competition with id 5",
+                    "expected": "Should use LeaderboardRow with rank=1, JOIN to User through Participation",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Get top 3 users in competition 10",
+                    "expected": "Should use LeaderboardRow with rank<=3, JOIN to get usernames",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Select all winners across all competitions",
+                    "expected": "Should filter LeaderboardRow by rank=1, JOIN related tables",
+                    "difficulty": "hard"
+                }
+            ]
+        },
+        {
+            "category": "Aggregations",
+            "queries": [
+                {
+                    "query": "Count total number of users",
+                    "expected": "Should use COUNT(*) or COUNT(user_id)",
+                    "difficulty": "easy"
+                },
+                {
+                    "query": "Get total prize amount for competition 3",
+                    "expected": "Should use SUM(amount) from Prize table",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Count how many participants each competition has",
+                    "expected": "Should GROUP BY competition_id, COUNT participations",
+                    "difficulty": "medium"
+                },
+                {
+                    "query": "Get average score for each competition",
+                    "expected": "Should use AVG(score) from LeaderboardRow, GROUP BY competition",
+                    "difficulty": "medium"
+                }
+            ]
+        },
+        {
+            "category": "Sorting & Limiting",
+            "queries": [
+                {
+                    "query": "Select 10 most recent users",
+                    "expected": "Should ORDER BY created_at DESC, LIMIT 10",
+                    "difficulty": "easy"
+                },
+                {
+                    "query": "Get competitions sorted by start date",
+                    "expected": "Should ORDER BY start_at",
+                    "difficulty": "easy"
+                },
+                {
+                    "query": "Select top 5 competitions with highest prize amounts",
+                    "expected": "Should JOIN Prize, SUM/MAX amount, ORDER BY DESC, LIMIT 5",
+                    "difficulty": "hard"
+                }
+            ]
+        },
+        {
+            "category": "Complex Business Logic",
+            "queries": [
+                {
+                    "query": "Select users who participated in more than 3 competitions",
+                    "expected": "Should JOIN Participation, GROUP BY user_id, HAVING COUNT > 3",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Get competitions that have no submissions yet",
+                    "expected": "Should use LEFT JOIN or NOT EXISTS with Submission table",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Select users who won at least one competition",
+                    "expected": "Should filter LeaderboardRow by rank=1, DISTINCT users",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Get competitions with more than 10 participants",
+                    "expected": "Should JOIN Participation, GROUP BY, HAVING COUNT > 10",
+                    "difficulty": "hard"
+                }
+            ]
+        },
+        {
+            "category": "Edge Cases & Tricky Queries",
+            "queries": [
+                {
+                    "query": "Select competitions organized by users who joined in 2023",
+                    "expected": "Should JOIN User and Competition, filter User.created_at",
+                    "difficulty": "hard"
+                },
+                {
+                    "query": "Get users who submitted but never won",
+                    "expected": "Should use subqueries or LEFT JOIN with LeaderboardRow rank filtering",
+                    "difficulty": "very hard"
+                },
+                {
+                    "query": "Select competitions that ended but have no winner recorded",
+                    "expected": "Should JOIN Competition and LeaderboardRow, check for missing rank=1",
+                    "difficulty": "very hard"
+                }
+            ]
+        }
+    ],
+    "improvement_areas": [
+        {
+            "area": "Ambiguous time references",
+            "issue": "Queries like 'users who played at 2024' are unclear - could mean joined platform, joined competition, or competed in",
+            "solution": "Add query rewriting layer to clarify intent before RAG retrieval"
+        },
+        {
+            "area": "Natural language understanding",
+            "issue": "Model works better with SQL-like phrasing ('Select', 'Get') than conversational ('show me', 'give me')",
+            "solution": "Fine-tune prompt or use query normalization preprocessing"
+        },
+        {
+            "area": "Complex aggregations",
+            "issue": "Multi-step logic like 'users who participated in more than X competitions' may fail",
+            "solution": "Enhance schema descriptions with aggregation examples"
+        },
+        {
+            "area": "Subqueries and NOT EXISTS",
+            "issue": "Negative logic ('competitions with no submissions') is challenging for LLMs",
+            "solution": "Add examples of NOT EXISTS patterns to schema hints"
+        },
+        {
+            "area": "Context window",
+            "issue": "With only top-5 tables, complex queries may miss required tables",
+            "solution": "Implement query expansion or increase top_k dynamically based on query complexity"
+        }
+    ]
+}
