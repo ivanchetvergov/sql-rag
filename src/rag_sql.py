@@ -3,6 +3,9 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import json
 from src.model import SQLCoderAgent
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
+from src.db_models import engine
 
 # setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,8 +38,8 @@ class RAGSQL:
         self.index = faiss.IndexFlatL2(self.embeddings.shape[1])
         self.index.add(self.embeddings)  # type: ignore
 
-        # initialize SQL model
         self.sql_agent = SQLCoderAgent()
+        self.Session = sessionmaker(bind=engine)
 
     def retrieve_schema(self, query, top_k: int=5):
         query_embeddings = self.embedding_model.encode([query])
@@ -140,6 +143,29 @@ class RAGSQL:
         logger.debug(f"Full prompt:\n{prompt}")
 
         return self.sql_agent.generate_response(prompt)
+
+    def execute_sql(self, sql_query: str, limit: int = 3):
+        """
+        Execute SQL query with safety checks and result limiting.
+        Only allows SELECT queries.
+        """
+        sql_upper = sql_query.strip().upper()
+        if not sql_upper.startswith("SELECT"):
+            raise ValueError("Only SELECT queries are allowed for execution.")
+
+        if "LIMIT" not in sql_upper:
+            sql_query += f" LIMIT {limit}"
+
+        try:
+            session = self.Session()
+            result = session.execute(text(sql_query))
+            rows = result.fetchall()
+            columns = result.keys()
+            session.close()
+            return {"columns": list(columns), "rows": [list(row) for row in rows]}
+        except Exception as e:
+            logger.error(f"Error executing SQL: {e}")
+            raise ValueError(f"SQL execution error: {str(e)}")
 
 
 if __name__ == "__main__":

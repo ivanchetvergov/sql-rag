@@ -89,7 +89,7 @@ class PrizeConfig(BaseModel):
         "Participation certificate"
     ]
     amounts: List[float] = [10000.0, 5000.0, 2500.0, 0.0]
-    currencies: List[str] = ["USD", "EUR", "USD", "USD"]
+    currencies: List[str] = ["USD", "EUR", "GBP", "CNY"]
 
 class SubmissionConfig(BaseModel):
     statuses: List[str] = ["queued", "processing", "completed", "failed"]
@@ -104,7 +104,7 @@ class KernelConfig(BaseModel):
     languages: List[str] = ["python", "r", "julia", "cpp"]
 
 class SeedConfig(BaseModel):
-    num_users: int = 50
-    num_competitions: int = 20
-    num_participations: int = 100
-    num_submissions: int = 200
+    num_users: int = 10000
+    num_competitions: int = 300
+    num_participations: int = 100000
+    num_submissions: int = 1000000
