@@ -78,8 +78,6 @@ curl -X POST "http://127.0.0.1:8000/execute-sql" -H "Content-Type: application/j
 
 ## Примеры
 
-1) Правильный запрос — сгенерирован и выполнен:
-
 ```json
 {
   "query": "Count how many participants each competition has",
@@ -89,19 +87,6 @@ curl -X POST "http://127.0.0.1:8000/execute-sql" -H "Content-Type: application/j
     "rows": [["House Price Prediction 103",160],["House Price Prediction 107",505],["House Price Prediction 11",487]]
   }
 }
-```
-
-1) Запрос с некорректным ответом от модели — анализ и исправление:
-
-```sql
-SELECT DISTINCT u.user_id, u.username
-FROM "user" u
-WHERE EXISTS (
-  SELECT 1 FROM participation p JOIN "submission" s ON p.participation_id = s.participation_id WHERE p.user_id = u.user_id
-)
-AND NOT EXISTS (
-  SELECT 1 FROM leaderboard_row lr JOIN participation p2 ON lr.participation_id = p2.participation_id WHERE p2.user_id = u.user_id AND lr.rank = 1
-);
 ```
 
 ---
