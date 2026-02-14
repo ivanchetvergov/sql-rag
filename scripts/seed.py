@@ -228,17 +228,6 @@ def seed_database():
     try:
         print("Seeding database with synthetic data...")
 
-        print("Clearing existing data...")
-        tables_to_clear = [
-            'CodeKernel', 'LeaderboardRow', 'Evaluation', 'Submission', 'FileArtifact',
-            'Dataset', 'Participation', 'Prize', 'CompetitionConfig', 'Competition',
-            'Metric', 'TaskType', 'User'
-        ]
-        for table in tables_to_clear:
-            session.execute(text(f'TRUNCATE TABLE "{table}" CASCADE;'))
-        session.commit()
-        print("Existing data cleared.")
-
         insert_task_types(session)
         print("Task types inserted")
 

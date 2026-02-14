@@ -1,7 +1,7 @@
 [
   {
-    "table": "\"User\"",
-    "description": "Table: \"User\" (always use double quotes). Stores platform users. Columns: user_id (PK), username (display name), email, created_at (timestamp when user joined the PLATFORM, use this for 'users who joined in YYYY' queries), bio (text). For queries about competition organizers or participants, JOIN with Competition (via organizer_id) or Participation (via user_id).",
+    "table": "\"user\"",
+    "description": "Table: \"user\" (MUST use double quotes - reserved word). Stores platform users. Columns: user_id (PK), username (display name), email, created_at (timestamp when user joined the PLATFORM, use this for 'users who joined in YYYY' queries), bio (text). For queries about competition organizers or participants, JOIN with competition (via organizer_id) or participation (via user_id).",
     "attributes": [
       "user_id",
       "username",
@@ -10,13 +10,13 @@
       "bio"
     ],
     "examples": [
-      "Q: Select all users who joined in 2023 | A: SELECT user_id, username FROM \"User\" WHERE EXTRACT(YEAR FROM created_at) = 2023;",
-      "Q: Get all users | A: SELECT * FROM \"User\";"
+      "Q: Select all users who joined in 2023 | A: SELECT user_id, username FROM \"user\" WHERE EXTRACT(YEAR FROM created_at) = 2023;",
+      "Q: Get all users | A: SELECT * FROM \"user\";"
     ]
   },
   {
-    "table": "\"TaskType\"",
-    "description": "Table: \"TaskType\" (always use double quotes). Lookup table for competition types. Columns: task_type_id (PK), code (short identifier like 'classification'), description (text explanation), valid_response_format (validation rules). JOIN with Competition via task_type_id to filter by competition type.",
+    "table": "\"task_type\"",
+    "description": "Table: \"task_type\" (always use double quotes). Lookup table for competition types. Columns: task_type_id (PK), code (short identifier like 'classification'), description (text explanation), valid_response_format (validation rules). JOIN with competition via task_type_id to filter by competition type.",
     "attributes": [
       "task_type_id",
       "code",
@@ -24,15 +24,15 @@
       "valid_response_format"
     ],
     "examples": [
-      "Get all task types | SELECT * FROM \"TaskType\";",
-      "Find task type by code | SELECT * FROM \"TaskType\" WHERE code = 'classification';",
-      "Get task types for competitions | SELECT tt.code, COUNT(c.competition_id) FROM \"TaskType\" tt JOIN \"Competition\" c ON tt.task_type_id = c.task_type_id GROUP BY tt.code;",
-      "List task type names | SELECT task_type_id, code, description FROM \"TaskType\";"
+      "Get all task types | SELECT * FROM task_type;",
+      "Find task type by code | SELECT * FROM task_type WHERE code = 'classification';",
+      "Get task types for competitions | SELECT tt.code, COUNT(c.competition_id) FROM task_type tt JOIN competition c ON tt.task_type_id = c.task_type_id GROUP BY tt.code;",
+      "List task type names | SELECT task_type_id, code, description FROM task_type;"
     ]
   },
   {
-    "table": "\"Metric\"",
-    "description": "Table: \"Metric\" (always use double quotes). Scoring functions for evaluations. Columns: metric_id (PK), task_type_id (FK to TaskType), name (metric name like 'LogLoss', 'MSE'), formula, optimization_direction ('maximize' or 'minimize'), description. JOIN with TaskType via task_type_id or CompetitionConfig via metric_id.",
+    "table": "\"metric\"",
+    "description": "Table: metric. Metric definitions (LogLoss, MSE, etc). Use leaderboard_row for actual scores. Columns: metric_id (PK), task_type_id (FK), name, formula, optimization_direction.",
     "attributes": [
       "metric_id",
       "task_type_id",
@@ -42,15 +42,15 @@
       "description"
     ],
     "examples": [
-      "Get all metrics | SELECT * FROM \"Metric\";",
-      "Find metrics to maximize | SELECT * FROM \"Metric\" WHERE optimization_direction = 'maximize';",
-      "Get metrics for task type | SELECT m.name FROM \"Metric\" m JOIN \"TaskType\" t ON m.task_type_id = t.task_type_id WHERE t.code = 'classification';",
-      "List metric names | SELECT metric_id, name, optimization_direction FROM \"Metric\";"
+      "Get all metrics | SELECT * FROM metric;",
+      "Find metrics to maximize | SELECT * FROM metric WHERE optimization_direction = 'maximize';",
+      "Get metrics for task type | SELECT m.name FROM metric m JOIN task_type t ON m.task_type_id = t.task_type_id WHERE t.code = 'classification';",
+      "List metric names | SELECT metric_id, name, optimization_direction FROM metric;"
     ]
   },
   {
-    "table": "\"Competition\"",
-    "description": "Table: \"Competition\" (always use double quotes). Contest entity. Columns: competition_id (PK), organizer_id (FK to User.user_id - the user who CREATED/ORGANIZED this competition, NOT participants), task_type_id (FK to TaskType), title (competition NAME, not 'competition_name'), description, start_at (start date), end_at (end date), status ('draft', 'active', 'archived'). IMPORTANT: For 'competitions organized BY user X' use WHERE organizer_id = X (direct filter, no JOIN to Participation). For organizer name: JOIN User ON Competition.organizer_id = User.user_id. For participants: use Participation table instead.",
+    "table": "\"competition\"",
+    "description": "Table: competition. Contests with scores via leaderboard_row. Columns: competition_id (PK), organizer_id (FK to user), task_type_id (FK), title, description, start_at, end_at, status. For scores/averages: JOIN participation → leaderboard_row. Example average: SELECT c.title, AVG(lr.score) FROM competition c JOIN participation p ON c.competition_id = p.competition_id JOIN leaderboard_row lr ON p.participation_id = lr.participation_id GROUP BY c.title.",
     "attributes": [
       "competition_id",
       "organizer_id",
@@ -62,15 +62,16 @@
       "status"
     ],
     "examples": [
-      "Get active competitions | SELECT * FROM \"Competition\" WHERE status = 'active';",
-      "Competitions organized by user 5 | SELECT competition_id, title FROM \"Competition\" WHERE organizer_id = 5;",
-      "Competitions started in 2024 | SELECT * FROM \"Competition\" WHERE EXTRACT(YEAR FROM start_at) = 2024;",
-      "Get competition with organizer name | SELECT c.title, u.username FROM \"Competition\" c JOIN \"User\" u ON c.organizer_id = u.user_id;"
+      "Get active competitions | SELECT * FROM competition WHERE status = 'active';",
+      "Competitions organized by user 5 | SELECT competition_id, title FROM competition WHERE organizer_id = 5;",
+      "Competitions started in 2024 | SELECT * FROM competition WHERE EXTRACT(YEAR FROM start_at) = 2024;",
+      "Get competition with organizer name | SELECT c.title, u.username FROM competition c JOIN \"user\" u ON c.organizer_id = u.user_id;",
+      "Average score for each competition | SELECT c.title, AVG(lr.score) as average_score FROM competition c JOIN participation p ON c.competition_id = p.competition_id JOIN leaderboard_row lr ON p.participation_id = lr.participation_id GROUP BY c.title;"
     ]
   },
   {
-    "table": "\"CompetitionConfig\"",
-    "description": "Table: \"CompetitionConfig\" (always use double quotes). Rules for competitions. Columns: config_id (PK), competition_id (FK to Competition), metric_id (FK to Metric), aggregation_rule ('best', 'average'), max_daily_submissions (submission limit). JOIN with Competition and Metric for detailed config queries.",
+    "table": "\"competition_config\"",
+    "description": "Table: competition_config. Competition rules/settings. Columns: config_id (PK), competition_id (FK), metric_id (FK), aggregation_rule, max_daily_submissions.",
     "attributes": [
       "config_id",
       "competition_id",
@@ -86,8 +87,8 @@
     ]
   },
   {
-    "table": "\"Prize\"",
-    "description": "Table: \"Prize\" (always use double quotes). Monetary rewards. Columns: prize_id (PK), competition_id (FK to Competition), rank_position (1st, 2nd, etc.), description (text), amount (numeric), currency (default 'USD'). Use for queries about 'prizes', 'money', 'rewards', 'awards'. JOIN Competition via competition_id.",
+    "table": "\"prize\"",
+    "description": "Table: \"prize\" (always use double quotes). Monetary rewards. Columns: prize_id (PK), competition_id (FK to competition), rank_position (1st, 2nd, etc.), description (text), amount (numeric), currency (default 'USD'). Use for queries about 'prizes', 'money', 'rewards', 'awards'. JOIN competition via competition_id.",
     "attributes": [
       "prize_id",
       "competition_id",
@@ -104,8 +105,8 @@
     ]
   },
   {
-    "table": "\"Participation\"",
-    "description": "Table: \"Participation\" (always use double quotes). User enrollment in competitions AS PARTICIPANTS (not organizers). Columns: participation_id (PK), user_id (FK to User - the PARTICIPANT, NOT organizer), competition_id (FK to Competition), registered_at (timestamp when user joined THIS COMPETITION as participant, NOT platform registration), status ('active', 'disqualified'). Bridge table for User-Competition PARTICIPATION. IMPORTANT: Use this for 'users who participated/competed/played in competition X', NOT for 'competitions organized by user X' (use Competition.organizer_id instead).",
+    "table": "\"participation\"",
+    "description": "Table: participation. Bridge for competition scores/rankings. Required JOIN for: competition ↔ leaderboard_row (scores), user ↔ submissions. Columns: participation_id (PK), user_id (FK to user), competition_id (FK to competition), registered_at, status. For average scores: competition JOIN participation JOIN leaderboard_row. For checking if user participated: EXISTS with participation. For users who submitted: participation JOIN submission.",
     "attributes": [
       "participation_id",
       "user_id",
@@ -114,15 +115,16 @@
       "status"
     ],
     "examples": [
-      "Users in competition 10 | SELECT u.username FROM \"User\" u JOIN \"Participation\" p ON u.user_id = p.user_id WHERE p.competition_id = 10;",
-      "Competitions user participated in | SELECT c.title FROM \"Competition\" c JOIN \"Participation\" p ON c.competition_id = p.competition_id WHERE p.user_id = 5;",
-      "Count participants per competition | SELECT competition_id, COUNT(*) FROM \"Participation\" GROUP BY competition_id;",
-      "Users who participated in 2024 | SELECT DISTINCT u.user_id, u.username FROM \"User\" u JOIN \"Participation\" p ON u.user_id = p.user_id WHERE EXTRACT(YEAR FROM p.registered_at) = 2024;"
+      "Users in competition 10 | SELECT u.username FROM \"user\" u JOIN participation p ON u.user_id = p.user_id WHERE p.competition_id = 10;",
+      "Competitions user participated in | SELECT c.title FROM competition c JOIN participation p ON c.competition_id = p.competition_id WHERE p.user_id = 5;",
+      "Count participants per competition | SELECT competition_id, COUNT(*) FROM participation GROUP BY competition_id;",
+      "Active participants | SELECT * FROM participation WHERE status = 'active';",
+      "Users who participated in more than 3 competitions | SELECT u.user_id, u.username, COUNT(p.competition_id) as comp_count FROM \"user\" u JOIN participation p ON u.user_id = p.user_id GROUP BY u.user_id, u.username HAVING COUNT(p.competition_id) > 3;"
     ]
   },
   {
-    "table": "\"Dataset\"",
-    "description": "Table: \"Dataset\" (always use double quotes). Competition data collections. Columns: dataset_id (PK), competition_id (FK to Competition), name (dataset NAME, not 'dataset_name'), usage_type ('training', 'testing'), is_hidden (boolean), created_at. For 'competitions with datasets', JOIN Competition via competition_id and use Dataset.name.",
+    "table": "\"dataset\"",
+    "description": "Table: \"dataset\" (always use double quotes). Competition data collections. Columns: dataset_id (PK), competition_id (FK to competition), name (dataset NAME, not 'dataset_name'), usage_type ('training', 'testing'), is_hidden (boolean), created_at. For 'competitions with datasets', JOIN competition via competition_id and use dataset.name.",
     "attributes": [
       "dataset_id",
       "competition_id",
@@ -132,15 +134,15 @@
       "created_at"
     ],
     "examples": [
-      "Competitions with datasets | SELECT c.title, d.name FROM \"Competition\" c JOIN \"Dataset\" d ON c.competition_id = d.competition_id;",
+      "Competitions with datasets | SELECT c.title, d.name FROM \"competition\" c JOIN \"dataset\" d ON c.competition_id = d.competition_id;",
       "Training datasets for competition 5 | SELECT * FROM \"Dataset\" WHERE competition_id = 5 AND usage_type = 'training';",
       "Public datasets | SELECT * FROM \"Dataset\" WHERE is_hidden = FALSE;",
       "Count datasets per competition | SELECT competition_id, COUNT(*) FROM \"Dataset\" GROUP BY competition_id;"
     ]
   },
   {
-    "table": "\"FileArtifact\"",
-    "description": "Table: \"FileArtifact\" (always use double quotes). Physical file metadata. Columns: file_id (PK), dataset_id (FK to Dataset), filename, storage_path, checksum, size_bytes. JOIN Dataset via dataset_id for file queries.",
+    "table": "\"file_artifact\"",
+    "description": "Table: \"file_artifact\" (always use double quotes). Physical file metadata. Columns: file_id (PK), dataset_id (FK to dataset), filename, storage_path, checksum, size_bytes. JOIN dataset via dataset_id for file queries.",
     "attributes": [
       "file_id",
       "dataset_id",
@@ -150,15 +152,15 @@
       "size_bytes"
     ],
     "examples": [
-      "Files in dataset 3 | SELECT * FROM \"FileArtifact\" WHERE dataset_id = 3;",
-      "Large files over 1GB | SELECT * FROM \"FileArtifact\" WHERE size_bytes > 1073741824;",
-      "Get file with dataset name | SELECT f.filename, d.name FROM \"FileArtifact\" f JOIN \"Dataset\" d ON f.dataset_id = d.dataset_id;",
+      "Files in dataset 3 | SELECT * FROM \"file_artifact\" WHERE dataset_id = 3;",
+      "Large files over 1GB | SELECT * FROM \"file_artifact\" WHERE size_bytes > 1073741824;",
+      "Get file with dataset name | SELECT f.filename, d.name FROM \"file_artifact\" f JOIN \"dataset\" d ON f.dataset_id = d.dataset_id;",
       "Total size of dataset | SELECT SUM(size_bytes) FROM \"FileArtifact\" WHERE dataset_id = 5;"
     ]
   },
   {
-    "table": "\"Submission\"",
-    "description": "Table: \"Submission\" (always use double quotes). User solution uploads. Columns: submission_id (PK), participation_id (FK to Participation), file_path, submitted_at (timestamp), status ('queued', 'success', 'failed'). JOIN Participation to link users/competitions. For evaluation scores, JOIN Evaluation via submission_id.",
+    "table": "\"submission\"",
+    "description": "Table: \"submission\" (always use double quotes). User solution uploads. Columns: submission_id (PK), participation_id (FK to participation), file_path, submitted_at (timestamp), status ('queued', 'success', 'failed'). JOIN participation to link users/competitions. For evaluation scores, JOIN evaluation via submission_id. For 'users who submitted', use EXISTS with submission. For 'competitions with no submissions', use LEFT JOIN and check IS NULL.",
     "attributes": [
       "submission_id",
       "participation_id",
@@ -167,15 +169,16 @@
       "status"
     ],
     "examples": [
-      "Submissions for user in competition | SELECT s.* FROM \"Submission\" s JOIN \"Participation\" p ON s.participation_id = p.participation_id WHERE p.user_id = 5 AND p.competition_id = 10;",
-      "Successful submissions | SELECT * FROM \"Submission\" WHERE status = 'success';",
-      "Recent submissions | SELECT * FROM \"Submission\" ORDER BY submitted_at DESC LIMIT 20;",
-      "Count submissions per user | SELECT p.user_id, COUNT(s.submission_id) FROM \"Submission\" s JOIN \"Participation\" p ON s.participation_id = p.participation_id GROUP BY p.user_id;"
+      "Submissions for user in competition | SELECT s.* FROM \"submission\" s JOIN \"participation\" p ON s.participation_id = p.participation_id WHERE p.user_id = 5 AND p.competition_id = 10;",
+      "Successful submissions | SELECT * FROM \"submission\" WHERE status = 'success';",
+      "Recent submissions | SELECT * FROM \"submission\" ORDER BY submitted_at DESC LIMIT 20;",
+      "Count submissions per user | SELECT p.user_id, COUNT(s.submission_id) FROM \"submission\" s JOIN \"participation\" p ON s.participation_id = p.participation_id GROUP BY p.user_id;",
+      "Competitions with no submissions | SELECT c.* FROM competition c LEFT JOIN participation p ON c.competition_id = p.competition_id LEFT JOIN \"submission\" s ON p.participation_id = s.participation_id WHERE s.submission_id IS NULL;"
     ]
   },
   {
-    "table": "\"Evaluation\"",
-    "description": "Table: \"Evaluation\" (always use double quotes). Submission scoring results. Columns: evaluation_id (PK), submission_id (FK to Submission), metric_value (numeric score), is_valid (boolean), computed_at (timestamp), error_log. JOIN Submission via submission_id. For best scores, use LeaderboardRow instead.",
+    "table": "\"evaluation\"",
+    "description": "Table: evaluation. Individual submission scores (all attempts). Use leaderboard_row for best scores/rankings. Columns: evaluation_id (PK), submission_id (FK), metric_value, is_valid, computed_at, error_log.",
     "attributes": [
       "evaluation_id",
       "submission_id",
@@ -185,15 +188,15 @@
       "error_log"
     ],
     "examples": [
-      "Get evaluations with scores | SELECT s.*, e.metric_value FROM \"Submission\" s JOIN \"Evaluation\" e ON s.submission_id = e.submission_id;",
-      "Valid evaluations only | SELECT * FROM \"Evaluation\" WHERE is_valid = TRUE;",
-      "Best score for submission | SELECT MAX(metric_value) FROM \"Evaluation\" WHERE submission_id = 100;",
-      "Failed evaluations | SELECT * FROM \"Evaluation\" WHERE is_valid = FALSE;"
+      "Get evaluations with scores | SELECT s.*, e.metric_value FROM submission s JOIN evaluation e ON s.submission_id = e.submission_id;",
+      "Valid evaluations only | SELECT * FROM evaluation WHERE is_valid = TRUE;",
+      "Best score for submission | SELECT MAX(metric_value) FROM evaluation WHERE submission_id = 100;",
+      "Failed evaluations | SELECT * FROM evaluation WHERE is_valid = FALSE;"
     ]
   },
   {
-    "table": "\"LeaderboardRow\"",
-    "description": "Table: \"LeaderboardRow\" (always use double quotes). Competition rankings. Columns: row_id (PK), participation_id (FK to Participation), best_evaluation_id (FK to Evaluation), score (best metric_value), rank (1=winner, 2=second, etc.), updated_at. USE THIS for 'winner', 'top players', 'rankings' queries. For winner of competition X: SELECT User.username FROM LeaderboardRow JOIN Participation ON LeaderboardRow.participation_id = Participation.participation_id JOIN User ON Participation.user_id = User.user_id WHERE Participation.competition_id = X AND LeaderboardRow.rank = 1.",
+    "table": "\"leaderboard_row\"",
+    "description": "Table: leaderboard_row. BEST SCORES for competition rankings, averages, winners. Use for: average score, mean score, winner, top players, leaderboard, rankings. Columns: row_id (PK), participation_id (FK to participation), best_evaluation_id (FK), score (best score - use for AVG/aggregations), rank (1=winner, 2=second), updated_at. For winners: rank=1. For 'never won': NOT EXISTS with rank=1. Example: Average score per competition: SELECT c.title, AVG(lr.score) FROM competition c JOIN participation p ON c.competition_id = p.competition_id JOIN leaderboard_row lr ON p.participation_id = lr.participation_id GROUP BY c.title. Do NOT use evaluation/metric for score aggregations.",
     "attributes": [
       "row_id",
       "participation_id",
@@ -203,15 +206,17 @@
       "updated_at"
     ],
     "examples": [
-      "Winner of competition 5 | SELECT u.username FROM \"LeaderboardRow\" lr JOIN \"Participation\" p ON lr.participation_id = p.participation_id JOIN \"User\" u ON p.user_id = u.user_id WHERE p.competition_id = 5 AND lr.rank = 1;",
-      "Top 3 in competition 10 | SELECT u.username, lr.score, lr.rank FROM \"LeaderboardRow\" lr JOIN \"Participation\" p ON lr.participation_id = p.participation_id JOIN \"User\" u ON p.user_id = u.user_id WHERE p.competition_id = 10 AND lr.rank <= 3 ORDER BY lr.rank;",
-      "Leaderboard for competition | SELECT u.username, lr.score, lr.rank FROM \"LeaderboardRow\" lr JOIN \"Participation\" p ON lr.participation_id = p.participation_id JOIN \"User\" u ON p.user_id = u.user_id WHERE p.competition_id = 7 ORDER BY lr.rank;",
-      "All winners | SELECT DISTINCT u.username FROM \"LeaderboardRow\" lr JOIN \"Participation\" p ON lr.participation_id = p.participation_id JOIN \"User\" u ON p.user_id = u.user_id WHERE lr.rank = 1;"
+      "Winner of competition 5 | SELECT u.username FROM leaderboard_row lr JOIN participation p ON lr.participation_id = p.participation_id JOIN \"user\" u ON p.user_id = u.user_id WHERE p.competition_id = 5 AND lr.rank = 1;",
+      "Top 3 in competition 10 | SELECT u.username, lr.score, lr.rank FROM leaderboard_row lr JOIN participation p ON lr.participation_id = p.participation_id JOIN \"user\" u ON p.user_id = u.user_id WHERE p.competition_id = 10 AND lr.rank <= 3 ORDER BY lr.rank;",
+      "Average score per competition | SELECT c.title, AVG(lr.score) as average_score FROM competition c JOIN participation p ON c.competition_id = p.competition_id JOIN leaderboard_row lr ON p.participation_id = lr.participation_id GROUP BY c.title;",
+      "All winners | SELECT DISTINCT u.username FROM leaderboard_row lr JOIN participation p ON lr.participation_id = p.participation_id JOIN \"user\" u ON p.user_id = u.user_id WHERE lr.rank = 1;",
+      "Users who never won | SELECT DISTINCT u.user_id, u.username FROM \"user\" u WHERE EXISTS (SELECT 1 FROM participation p WHERE p.user_id = u.user_id) AND NOT EXISTS (SELECT 1 FROM leaderboard_row lr JOIN participation p ON lr.participation_id = p.participation_id WHERE p.user_id = u.user_id AND lr.rank = 1);",
+      "Users who won at least once | SELECT DISTINCT u.user_id, u.username FROM \"user\" u JOIN participation p ON u.user_id = p.user_id JOIN leaderboard_row lr ON p.participation_id = lr.participation_id WHERE lr.rank = 1;"
     ]
   },
   {
-    "table": "\"CodeKernel\"",
-    "description": "Table: \"CodeKernel\" (always use double quotes). User code notebooks. Columns: kernel_id (PK), participation_id (FK to Participation), evaluation_id (FK to Evaluation, nullable), title, source_code (text), language ('Python', 'R', etc.), created_at. JOIN Participation and Evaluation for linking.",
+    "table": "\"code_kernel\"",
+    "description": "Table: \"code_kernel\" (always use double quotes). User code notebooks. Columns: kernel_id (PK), participation_id (FK to participation), evaluation_id (FK to evaluation, nullable), title, source_code (text), language ('Python', 'R', etc.), created_at. JOIN participation and evaluation for linking.",
     "attributes": [
       "kernel_id",
       "participation_id",
@@ -222,10 +227,10 @@
       "created_at"
     ],
     "examples": [
-      "Kernels for competition | SELECT ck.* FROM \"CodeKernel\" ck JOIN \"Participation\" p ON ck.participation_id = p.participation_id WHERE p.competition_id = 5;",
-      "Python kernels | SELECT * FROM \"CodeKernel\" WHERE language = 'Python';",
-      "Kernels by user | SELECT ck.title FROM \"CodeKernel\" ck JOIN \"Participation\" p ON ck.participation_id = p.participation_id WHERE p.user_id = 10;",
-      "Recent kernels | SELECT * FROM \"CodeKernel\" ORDER BY created_at DESC LIMIT 10;"
+      "Kernels for competition | SELECT ck.* FROM \"code_kernel\" ck JOIN \"participation\" p ON ck.participation_id = p.participation_id WHERE p.competition_id = 5;",
+      "Python kernels | SELECT * FROM \"code_kernel\" WHERE language = 'Python';",
+      "Kernels by user | SELECT ck.title FROM \"code_kernel\" ck JOIN \"participation\" p ON ck.participation_id = p.participation_id WHERE p.user_id = 10;",
+      "Recent kernels | SELECT * FROM \"code_kernel\" ORDER BY created_at DESC LIMIT 10;"
     ]
   }
 ]

@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 from src.db_models import engine
 
-# setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -21,10 +20,8 @@ class RAGSQL:
         with open(schema_file, 'r') as f:
             self.schema = json.load(f)
 
-        # Build rich descriptions for embeddings (includes relationships and hints)
         self.descriptions = []
         for item in self.schema:
-            # Extract key hints from description for better retrieval
             desc = (
                 f"Table: {item['table']}\n"
                 f"{item['description']}\n"
@@ -41,34 +38,63 @@ class RAGSQL:
         self.sql_agent = SQLCoderAgent()
         self.Session = sessionmaker(bind=engine)
 
+    def _enrich_retrieved_tables(self, query_lower: str, retrieved: list) -> list:
+        """
+        Enrich FAISS-retrieved tables with forced tables based on query keywords.
+        Returns list of additional tables to include.
+        """
+        forced_tables = []
+
+        # Score aggregation queries
+        if any(word in query_lower for word in ['average score', 'avg score', 'mean score', 'average rank', 'score per competition', 'score for each']):
+            self._add_if_missing(forced_tables, retrieved, 'leaderboard_row')
+            self._add_if_missing(forced_tables, retrieved, 'participation')
+
+        # Winner/ranking queries
+        if any(word in query_lower for word in ['winner', 'won', 'never won', 'not won', 'at least one', 'rank', 'leaderboard', 'top', 'best score']):
+            self._add_if_missing(forced_tables, retrieved, 'leaderboard_row')
+            self._add_if_missing(forced_tables, retrieved, 'participation')
+
+        # Submission queries
+        if any(word in query_lower for word in ['submit', 'submission', 'submitted']):
+            self._add_if_missing(forced_tables, retrieved, 'submission', exclude_pattern='max_daily_submissions')
+            self._add_if_missing(forced_tables, retrieved, 'participation')
+
+        # Negative logic queries (no/never/without)
+        if any(word in query_lower for word in ['no submission', 'no winner', 'never', 'without', 'have not', 'haven\'t']):
+            if 'submission' in query_lower or 'submitted' in query_lower:
+                self._add_if_missing(forced_tables, retrieved, 'submission', exclude_pattern='max_daily_submissions')
+            if 'winner' in query_lower or 'won' in query_lower:
+                self._add_if_missing(forced_tables, retrieved, 'leaderboard_row')
+
+        # Entity mentions
+        if any(word in query_lower for word in ['user', 'username', 'organizer', 'participant']):
+            self._add_if_missing(forced_tables, retrieved, '"user"')
+
+        if any(word in query_lower for word in ['competition', 'contest']):
+            self._add_if_missing(forced_tables, retrieved, 'competition', exclude_pattern='competition_config')
+
+        if any(word in query_lower for word in ['participate', 'participated', 'joined competition', 'registered']):
+            self._add_if_missing(forced_tables, retrieved, 'participation')
+
+        return forced_tables
+
+    def _add_if_missing(self, forced_tables: list, retrieved: list, table_name: str, exclude_pattern: str = None):
+        """Helper to add table if not already in retrieved."""
+        table = next((d for d in self.descriptions
+                     if table_name in d.lower() and (not exclude_pattern or exclude_pattern not in d.lower())),
+                     None)
+        if table and table not in retrieved and table not in forced_tables:
+            forced_tables.append(table)
+
     def retrieve_schema(self, query, top_k: int=5):
         query_embeddings = self.embedding_model.encode([query])
         _, indices = self.index.search(query_embeddings, k=top_k)  # type: ignore
         retrieved = [self.descriptions[i] for i in indices[0]]
 
+        # Enrich with keyword-based forced tables
         query_lower = query.lower()
-        forced_tables = []
-
-        # if query mentions specific entities, ensure their tables are included
-        if any(word in query_lower for word in ['user', 'username', 'organizer', 'participant']):
-            user_table = next((d for d in self.descriptions if '"User"' in d), None)
-            if user_table and user_table not in retrieved:
-                forced_tables.append(user_table)
-
-        if any(word in query_lower for word in ['competition', 'contest']):
-            comp_table = next((d for d in self.descriptions if '"Competition"' in d), None)
-            if comp_table and comp_table not in retrieved:
-                forced_tables.append(comp_table)
-
-        if any(word in query_lower for word in ['winner', 'won', 'rank', 'leaderboard', 'top']):
-            lb_table = next((d for d in self.descriptions if '"LeaderboardRow"' in d), None)
-            if lb_table and lb_table not in retrieved:
-                forced_tables.append(lb_table)
-
-        if any(word in query_lower for word in ['participate', 'participated', 'joined competition', 'registered']):
-            part_table = next((d for d in self.descriptions if '"Participation"' in d), None)
-            if part_table and part_table not in retrieved:
-                forced_tables.append(part_table)
+        forced_tables = self._enrich_retrieved_tables(query_lower, retrieved)
 
         all_tables = retrieved + forced_tables
         return all_tables[:top_k + 2]
@@ -126,17 +152,21 @@ class RAGSQL:
                 cols_str = ', '.join(col_defs)
                 create_statements.append(f"CREATE TABLE {item['table']} ({cols_str});")
 
-        schema_context = "\n".join(create_statements)
+        schema_context = "\n\n".join(retrieved) + "\n\n" + "\n".join(create_statements)
 
         prompt = (
-            f"### Task\n"
-            f"Generate a SQL query to answer [QUESTION]{query}[/QUESTION]\n\n"
-            f"### Database Schema\n"
-            f"The query will run on a database with the following schema:\n"
+            f"### Task:\n"
+            f"Convert the question into a SQL query using the provided Postgres schema.\n\n"
+            f"### Rules:\n"
+            f"- Use table aliases to prevent ambiguity\n"
+            f"- Use exact table names from schema (lowercase, singular form)\n"
+            f"- Study the schema examples carefully for correct JOIN patterns\n\n"
+            f"### Schema:\n"
             f"{schema_context}\n\n"
-            f"### Answer\n"
-            f"Given the database schema, here is the SQL query that [QUESTION]{query}[/QUESTION]\n"
-            f"[SQL]"
+            f"### Question:\n"
+            f"{query}\n\n"
+            f"### SQL:\n"
+            f"```sql\n"
         )
 
         logger.info(f"Prompt length: {len(prompt)} characters")
@@ -149,7 +179,8 @@ class RAGSQL:
         Execute SQL query with safety checks and result limiting.
         Only allows SELECT queries.
         """
-        sql_upper = sql_query.strip().upper()
+        sql_query = sql_query.rstrip(';').strip()
+        sql_upper = sql_query.upper()
         if not sql_upper.startswith("SELECT"):
             raise ValueError("Only SELECT queries are allowed for execution.")
 

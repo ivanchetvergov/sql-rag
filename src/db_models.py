@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 Base = declarative_base()
 
 class User(Base):
-    __tablename__ = 'User'
+    __tablename__ = 'user'
     user_id = Column(Integer, primary_key=True)
     username = Column(String(100), nullable=False)
     email = Column(String(255), nullable=False)
@@ -17,7 +17,7 @@ class User(Base):
     participations = relationship("Participation", back_populates="user")
 
 class TaskType(Base):
-    __tablename__ = 'TaskType'
+    __tablename__ = 'task_type'
     task_type_id = Column(Integer, primary_key=True)
     code = Column(String(50), nullable=False)
     description = Column(Text)
@@ -27,9 +27,9 @@ class TaskType(Base):
     metrics = relationship("Metric", back_populates="task_type")
 
 class Metric(Base):
-    __tablename__ = 'Metric'
+    __tablename__ = 'metric'
     metric_id = Column(Integer, primary_key=True)
-    task_type_id = Column(Integer, ForeignKey('TaskType.task_type_id'))
+    task_type_id = Column(Integer, ForeignKey('task_type.task_type_id'))
     name = Column(String(100), nullable=False)
     formula = Column(Text)
     optimization_direction = Column(String(10))
@@ -39,10 +39,10 @@ class Metric(Base):
     competition_configs = relationship("CompetitionConfig", back_populates="metric")
 
 class Competition(Base):
-    __tablename__ = 'Competition'
+    __tablename__ = 'competition'
     competition_id = Column(Integer, primary_key=True)
-    organizer_id = Column(Integer, ForeignKey('User.user_id'))
-    task_type_id = Column(Integer, ForeignKey('TaskType.task_type_id'))
+    organizer_id = Column(Integer, ForeignKey('user.user_id'))
+    task_type_id = Column(Integer, ForeignKey('task_type.task_type_id'))
     title = Column(String(255), nullable=False)
     description = Column(Text)
     start_at = Column(DateTime)
@@ -57,10 +57,10 @@ class Competition(Base):
     datasets = relationship("Dataset", back_populates="competition")
 
 class CompetitionConfig(Base):
-    __tablename__ = 'CompetitionConfig'
+    __tablename__ = 'competition_config'
     config_id = Column(Integer, primary_key=True)
-    competition_id = Column(Integer, ForeignKey('Competition.competition_id'))
-    metric_id = Column(Integer, ForeignKey('Metric.metric_id'))
+    competition_id = Column(Integer, ForeignKey('competition.competition_id'))
+    metric_id = Column(Integer, ForeignKey('metric.metric_id'))
     aggregation_rule = Column(String(20), default='best')
     max_daily_submissions = Column(Integer, default=5)
 
@@ -68,9 +68,9 @@ class CompetitionConfig(Base):
     metric = relationship("Metric", back_populates="competition_configs")
 
 class Prize(Base):
-    __tablename__ = 'Prize'
+    __tablename__ = 'prize'
     prize_id = Column(Integer, primary_key=True)
-    competition_id = Column(Integer, ForeignKey('Competition.competition_id'))
+    competition_id = Column(Integer, ForeignKey('competition.competition_id'))
     rank_position = Column(Integer)
     description = Column(Text)
     amount = Column(DECIMAL(15, 2))
@@ -79,10 +79,10 @@ class Prize(Base):
     competition = relationship("Competition", back_populates="prizes")
 
 class Participation(Base):
-    __tablename__ = 'Participation'
+    __tablename__ = 'participation'
     participation_id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('User.user_id'))
-    competition_id = Column(Integer, ForeignKey('Competition.competition_id'))
+    user_id = Column(Integer, ForeignKey('user.user_id'))
+    competition_id = Column(Integer, ForeignKey('competition.competition_id'))
     registered_at = Column(DateTime, default=datetime.now(UTC))
     status = Column(String(20), default='active')
 
@@ -93,9 +93,9 @@ class Participation(Base):
     code_kernels = relationship("CodeKernel", back_populates="participation")
 
 class Dataset(Base):
-    __tablename__ = 'Dataset'
+    __tablename__ = 'dataset'
     dataset_id = Column(Integer, primary_key=True)
-    competition_id = Column(Integer, ForeignKey('Competition.competition_id'))
+    competition_id = Column(Integer, ForeignKey('competition.competition_id'))
     name = Column(String(255), nullable=False)
     usage_type = Column(String(20))
     is_hidden = Column(Boolean, default=False)
@@ -105,9 +105,9 @@ class Dataset(Base):
     file_artifacts = relationship("FileArtifact", back_populates="dataset")
 
 class FileArtifact(Base):
-    __tablename__ = 'FileArtifact'
+    __tablename__ = 'file_artifact'
     file_id = Column(Integer, primary_key=True)
-    dataset_id = Column(Integer, ForeignKey('Dataset.dataset_id'))
+    dataset_id = Column(Integer, ForeignKey('dataset.dataset_id'))
     filename = Column(String(255), nullable=False)
     storage_path = Column(Text)
     checksum = Column(String(64))
@@ -116,9 +116,9 @@ class FileArtifact(Base):
     dataset = relationship("Dataset", back_populates="file_artifacts")
 
 class Submission(Base):
-    __tablename__ = 'Submission'
+    __tablename__ = 'submission'
     submission_id = Column(Integer, primary_key=True)
-    participation_id = Column(Integer, ForeignKey('Participation.participation_id'))
+    participation_id = Column(Integer, ForeignKey('participation.participation_id'))
     file_path = Column(Text)
     submitted_at = Column(DateTime, default=datetime.now(UTC))
     status = Column(String(20), default='queued')
@@ -127,9 +127,9 @@ class Submission(Base):
     evaluations = relationship("Evaluation", back_populates="submission")
 
 class Evaluation(Base):
-    __tablename__ = 'Evaluation'
+    __tablename__ = 'evaluation'
     evaluation_id = Column(Integer, primary_key=True)
-    submission_id = Column(Integer, ForeignKey('Submission.submission_id'))
+    submission_id = Column(Integer, ForeignKey('submission.submission_id'))
     metric_value = Column(DECIMAL(20, 10))
     is_valid = Column(Boolean, default=True)
     computed_at = Column(DateTime, default=datetime.now(UTC))
@@ -140,10 +140,10 @@ class Evaluation(Base):
     code_kernels = relationship("CodeKernel", back_populates="evaluation")
 
 class LeaderboardRow(Base):
-    __tablename__ = 'LeaderboardRow'
+    __tablename__ = 'leaderboard_row'
     row_id = Column(Integer, primary_key=True)
-    participation_id = Column(Integer, ForeignKey('Participation.participation_id'))
-    best_evaluation_id = Column(Integer, ForeignKey('Evaluation.evaluation_id'))
+    participation_id = Column(Integer, ForeignKey('participation.participation_id'))
+    best_evaluation_id = Column(Integer, ForeignKey('evaluation.evaluation_id'))
     score = Column(DECIMAL(20, 10))
     rank = Column(Integer)
     updated_at = Column(DateTime, default=datetime.now(UTC))
@@ -152,10 +152,10 @@ class LeaderboardRow(Base):
     best_evaluation = relationship("Evaluation", back_populates="leaderboard_rows")
 
 class CodeKernel(Base):
-    __tablename__ = 'CodeKernel'
+    __tablename__ = 'code_kernel'
     kernel_id = Column(Integer, primary_key=True)
-    participation_id = Column(Integer, ForeignKey('Participation.participation_id'))
-    evaluation_id = Column(Integer, ForeignKey('Evaluation.evaluation_id'), nullable=True)
+    participation_id = Column(Integer, ForeignKey('participation.participation_id'))
+    evaluation_id = Column(Integer, ForeignKey('evaluation.evaluation_id'), nullable=True)
     title = Column(String(255))
     source_code = Column(Text)
     language = Column(String(50))
