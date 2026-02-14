@@ -1,4 +1,4 @@
-# SQL-RAG — SQL retrieval-augmented generation for ML competition DB
+# SQL-RAG
 
 Кратко: лёгкий RAG-сервис, который превращает естественный язык в корректный PostgreSQL (generate) и выполняет его (execute) на локальной БД.
 
